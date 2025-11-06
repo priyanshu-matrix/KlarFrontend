@@ -1,5 +1,5 @@
 // API configuration and services
-const API_BASE_URL = 'https://7ed55a06fc93.ngrok-free.app';
+const API_BASE_URL = 'https://05644f2f1d43.ngrok-free.app';
 
 // Fake expense data to complement invoice data
 const generateFakeExpenses = () => [
@@ -183,12 +183,26 @@ export const fallbackInvoiceData = [
 export const invoiceAPI = {
   async getInvoices() {
     try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      const userEmail = JSON.parse(localStorage.getItem('user'))?.email;
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      };
+
+      // Add auth headers if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      if (userEmail) {
+        headers['auth_email'] = userEmail;
+      }
+
       const response = await fetch(`${API_BASE_URL}/getInvoices`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
+        headers: headers
       });
 
       if (!response.ok) {

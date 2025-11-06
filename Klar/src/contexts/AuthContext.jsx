@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
 const AuthContext = createContext();
+const API_BASE_URL = 'https://05644f2f1d43.ngrok-free.app';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -42,33 +43,43 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      // Simulate API call - replace with your actual API endpoint
-      const response = await new Promise((resolve) => {
-        setTimeout(() => {
-          // Mock successful login
-          resolve({
-            user: {
-              id: 1,
-              email: email,
-              firstName: 'John',
-              lastName: 'Doe'
-            },
-            token: 'mock-jwt-token-' + Date.now()
-          });
-        }, 1000);
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password
+        })
       });
 
-      const { user: userData, token } = response;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Extract user data and token from response
+      const { access_token, token_type, user: userData } = data;
+      const token = access_token; // Use access_token from API response
+      const user = userData || {
+        id: Date.now(),
+        email: email,
+        firstName: email.split('@')[0], // Extract username from email
+        lastName: 'User'
+      };
 
       // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('authToken', token);
 
       // Update state
-      setUser(userData);
+      setUser(user);
       setIsAuthenticated(true);
 
-      return { success: true, user: userData };
+      return { success: true, user: user, token: token };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: error.message };
@@ -80,33 +91,45 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     setIsLoading(true);
     try {
-      // Simulate API call - replace with your actual API endpoint
-      const response = await new Promise((resolve) => {
-        setTimeout(() => {
-          // Mock successful signup
-          resolve({
-            user: {
-              id: Date.now(),
-              email: userData.email,
-              firstName: userData.firstName,
-              lastName: userData.lastName
-            },
-            token: 'mock-jwt-token-' + Date.now()
-          });
-        }, 1000);
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({
+          email: userData.email,
+          password: userData.password,
+          firstName: userData.firstName,
+          lastName: userData.lastName
+        })
       });
 
-      const { user: newUser, token } = response;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Signup failed');
+      }
+
+      // Extract user data and token from response
+      const { access_token, token_type, user: responseUser } = data;
+      const token = access_token; // Use access_token from API response
+      const user = responseUser || {
+        id: Date.now(),
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName
+      };
 
       // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(newUser));
+      localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('authToken', token);
 
       // Update state
-      setUser(newUser);
+      setUser(user);
       setIsAuthenticated(true);
 
-      return { success: true, user: newUser };
+      return { success: true, user: user, token: token };
     } catch (error) {
       console.error('Signup error:', error);
       return { success: false, error: error.message };
