@@ -359,5 +359,110 @@ export const dashboardAPI = {
       completedInvoices,
       totalTransactions: invoices.length + expenses.length
     };
+  },
+
+  // Generate chart data for analytics
+  getAnalyticsData(data) {
+    const { invoices, expenses } = data;
+
+    // Generate monthly revenue data for the last 6 months
+    const monthlyData = this.generateMonthlyData(invoices, expenses);
+
+    // Generate category breakdown for expenses
+    const categoryData = this.generateCategoryData(expenses);
+
+    // Generate status distribution
+    const statusData = this.generateStatusData(invoices);
+
+    return {
+      monthly: monthlyData,
+      categories: categoryData,
+      status: statusData
+    };
+  },
+
+  generateMonthlyData(invoices, expenses) {
+    const months = [];
+    const currentDate = new Date();
+
+    // Generate last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(currentDate);
+      date.setMonth(date.getMonth() - i);
+
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.getFullYear();
+      const monthKey = `${year}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      // Filter invoices for this month
+      const monthInvoices = invoices.filter(invoice => {
+        const invoiceDate = new Date(invoice.date);
+        return invoiceDate.getFullYear() === date.getFullYear() &&
+               invoiceDate.getMonth() === date.getMonth();
+      });
+
+      // Filter expenses for this month
+      const monthExpenses = expenses.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate.getFullYear() === date.getFullYear() &&
+               expenseDate.getMonth() === date.getMonth();
+      });
+
+      const revenue = monthInvoices.reduce((sum, inv) => sum + (inv.total_amount_payable || 0), 0);
+      const totalExpenses = monthExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+      months.push({
+        month: `${monthName} ${year}`,
+        monthShort: monthName,
+        revenue: revenue,
+        expenses: totalExpenses,
+        profit: revenue - totalExpenses
+      });
+    }
+
+    return months;
+  },
+
+  generateCategoryData(expenses) {
+    const categories = {};
+
+    expenses.forEach(expense => {
+      const category = expense.category || 'Other';
+      if (!categories[category]) {
+        categories[category] = {
+          name: category,
+          value: 0,
+          count: 0
+        };
+      }
+      categories[category].value += expense.amount || 0;
+      categories[category].count += 1;
+    });
+
+    return Object.values(categories).sort((a, b) => b.value - a.value);
+  },
+
+  generateStatusData(invoices) {
+    const statuses = {
+      completed: 0,
+      pending: 0,
+      verification: 0
+    };
+
+    invoices.forEach(invoice => {
+      if (invoice.human_verification_required) {
+        statuses.verification++;
+      } else if (invoice.status === 'completed') {
+        statuses.completed++;
+      } else if (invoice.status === 'pending') {
+        statuses.pending++;
+      }
+    });
+
+    return [
+      { name: 'Completed', value: statuses.completed, color: '#22c55e' },
+      { name: 'Pending', value: statuses.pending, color: '#f59e0b' },
+      { name: 'Needs Verification', value: statuses.verification, color: '#ef4444' }
+    ];
   }
 };

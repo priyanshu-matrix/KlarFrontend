@@ -7,8 +7,8 @@ body{
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -98,7 +98,7 @@ body{
 }
 
 /* Dark theme variables for dashboard */
-[data-theme="dark"] {
+.dark, [data-theme="dark"] {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

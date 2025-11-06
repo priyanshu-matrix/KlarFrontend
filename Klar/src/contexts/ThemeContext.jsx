@@ -24,15 +24,20 @@ export const ThemeProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    // Apply theme to document root for Tailwind CSS dark mode
+    // Apply theme to document root and body for Tailwind CSS dark mode
+    const root = document.documentElement;
+    const body = document.body;
+
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      body.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      body.classList.remove('dark');
     }
 
     // Also set data attribute for compatibility
-    document.documentElement.setAttribute('data-theme', theme);
+    root.setAttribute('data-theme', theme);
 
     // Save theme preference
     localStorage.setItem('theme', theme);
