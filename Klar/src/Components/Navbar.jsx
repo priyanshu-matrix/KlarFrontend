@@ -1,36 +1,25 @@
 import "../Style/Navbar.css"
 import ThemeToggle from "./ThemeToggle"
+import { Link, useLocation } from 'react-router-dom'
 
-const Navbar = ({ name = "KLAR", bullets = [], className = "", useRouter = false }) => {
-  const handleNavigation = (path, onClick) => {
-    if (onClick && typeof onClick === 'function') {
-      onClick();
-    } else if (path) {
-      if (useRouter) {
-        // For future React Router integration
-        // navigate(path);
-        console.log('Navigate to:', path);
-      } else {
-        window.location.href = path;
-      }
-    }
-  };
+const Navbar = ({ name = "KLAR", bullets = [], className = "" }) => {
+  const location = useLocation();
 
   return (
     <nav className={`navbar-container ${className}`}>
       <div className="navbar-content">
         <div className="navbar-name">
-          {name}
+          <Link to="/">{name}</Link>
         </div>
         <div className="navbar-items">
           {bullets.map((item, index) => (
-            <button
+            <Link
               key={index}
-              className="navbar-item"
-              onClick={() => handleNavigation(item.path, item.onClick)}
+              to={item.path}
+              className={`navbar-item ${location.pathname === item.path ? 'active' : ''}`}
             >
               {item.label}
-            </button>
+            </Link>
           ))}
           <ThemeToggle className="navbar-theme-toggle" />
         </div>

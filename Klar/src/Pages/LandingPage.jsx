@@ -30,7 +30,7 @@ const LandingPage = () => {
             <TextType
               text={[" Invoice Manager.", " Finance Manager."]}
               typingSpeed={75}
-              pauseDuration={1500}
+              pauseDuration={3000}
               showCursor={true}
               cursorCharacter="|"
               autoGenerateColors={true}
