@@ -210,31 +210,109 @@ export const invoiceAPI = {
   }
 };
 
+// Function to generate artificial revenue data (80% more than actual)
+const generateArtificialRevenue = (actualInvoices) => {
+  const artificialInvoices = [];
+  const currentDate = new Date();
+
+  // Calculate total actual revenue
+  const actualRevenue = actualInvoices.reduce((sum, invoice) =>
+    sum + (invoice.total_amount_payable || 0), 0
+  );
+
+  // Generate 80% more revenue through artificial invoices
+  const additionalRevenue = actualRevenue * 0.8;
+  const baseRevenue = additionalRevenue / 5; // Spread across 5 artificial invoices
+
+  const artificialCustomers = [
+    'TechCorp Solutions', 'Digital Innovations Inc', 'Cloud Systems Ltd',
+    'Enterprise Software Co', 'Data Analytics Group'
+  ];
+
+  const artificialProducts = [
+    'Enterprise Software License', 'Cloud Infrastructure Services',
+    'Data Analytics Platform', 'Digital Transformation Suite', 'AI Integration Services'
+  ];
+
+  for (let i = 0; i < 5; i++) {
+    const variance = (Math.random() - 0.5) * 0.3; // ±15% variance
+    const amount = baseRevenue * (1 + variance);
+
+    // Generate dates within the last 30 days
+    const daysBack = Math.floor(Math.random() * 30);
+    const invoiceDate = new Date(currentDate);
+    invoiceDate.setDate(invoiceDate.getDate() - daysBack);
+
+    artificialInvoices.push({
+      invoice_id: `ART_${50000 + i}`,
+      order_id: `ART-2024-${String(10000 + i).padStart(5, '0')}`,
+      customer_name: artificialCustomers[i],
+      extracted_vendor_name: "Klar Business Solutions",
+      canonical_vendor_id: `ART_VEND_${i + 1}`,
+      ship_to_address: `${10001 + i * 1000}, Business District, NY, United States`,
+      date: invoiceDate.toISOString().split('T')[0],
+      ship_mode: "Digital Delivery",
+      product_id: `ART-PROD-${1000 + i}`,
+      product_name: artificialProducts[i],
+      quantity: 1,
+      unit_cost: amount,
+      currency: "USD",
+      sub_total: amount,
+      discount: 0,
+      shipping_fee: 0,
+      total_amount_payable: amount,
+      human_verification_required: false,
+      human_verification_reason: null,
+      status: "completed",
+      pdf_path: `artificial/invoice_${artificialCustomers[i].replace(/\s+/g, '_')}_ART_${50000 + i}.pdf`,
+      task_id: `art-${Date.now()}-${i}`,
+      type: 'invoice',
+      is_artificial: true
+    });
+  }
+
+  return artificialInvoices;
+};
+
 // Combined data service
 export const dashboardAPI = {
   async getDashboardData() {
     try {
       // Fetch invoices from API
-      const invoices = await invoiceAPI.getInvoices();
+      const actualInvoices = await invoiceAPI.getInvoices();
+
+      // Generate artificial revenue (80% more)
+      const artificialInvoices = generateArtificialRevenue(actualInvoices);
+
+      // Combine actual and artificial invoices
+      const allInvoices = [...actualInvoices, ...artificialInvoices];
 
       // Generate fake expenses
       const expenses = generateFakeExpenses();
 
       // Combine and return
       return {
-        invoices,
+        invoices: allInvoices,
+        actualInvoices,
+        artificialInvoices,
         expenses,
-        allTransactions: [...invoices, ...expenses]
+        allTransactions: [...allInvoices, ...expenses]
       };
     } catch (error) {
       console.warn('API failed, using fallback data:', error.message);
 
       // Use fallback data
+      const actualInvoices = fallbackInvoiceData;
+      const artificialInvoices = generateArtificialRevenue(actualInvoices);
+      const allInvoices = [...actualInvoices, ...artificialInvoices];
       const expenses = generateFakeExpenses();
+
       return {
-        invoices: fallbackInvoiceData,
+        invoices: allInvoices,
+        actualInvoices,
+        artificialInvoices,
         expenses,
-        allTransactions: [...fallbackInvoiceData, ...expenses]
+        allTransactions: [...allInvoices, ...expenses]
       };
     }
   },

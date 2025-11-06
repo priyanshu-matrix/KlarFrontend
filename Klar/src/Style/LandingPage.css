@@ -27,7 +27,18 @@
   align-items: center;
   height: 100vh;
   position: relative;
+  overflow: hidden;
 }
+.MiddleStuff{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
 
 .text-content {
   margin-bottom: 200px;
@@ -96,7 +107,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   font-size: 1.2rem;
   text-align: center;
   width: 100%;
@@ -106,5 +117,16 @@
   font-weight: 400;
   font-style: normal;
   opacity: 0.8;
-  white-space: nowrap;
+}
+
+.MiddleStuff .subtext-content {
+  top: 10%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 800px;
+  height: 200px;
+  text-align: left;
+  gap: 30px;
+  min-width: unset;
+  margin: 0;
 }
