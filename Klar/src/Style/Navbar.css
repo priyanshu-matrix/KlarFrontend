@@ -1,0 +1,136 @@
+/* Round Rectangle Navbar Styles */
+.navbar-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  width: 100%;
+  position: fixed;
+  z-index: 100;
+}
+
+.navbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(10px);
+  border-radius: 50px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  min-width: 850px;
+}
+
+[data-theme="dark"] .navbar-content {
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-content:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+[data-theme="dark"] .navbar-content:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.navbar-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-color);
+  letter-spacing: -0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.navbar-name:hover {
+  color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.navbar-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-item {
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.navbar-item:hover {
+  background: var(--hover-color);
+  color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.navbar-item:active {
+  transform: scale(0.95);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .navbar-content {
+    gap: 4px;
+    padding: 10px 16px;
+    min-width: 320px;
+  }
+
+  .navbar-name {
+    font-size: 16px;
+  }
+
+  .navbar-items {
+    gap: 4px;
+  }
+
+  .navbar-item {
+    padding: 6px 16px;
+    font-size: 13px;
+    min-width: 60px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-content {
+    flex-direction: column;
+    gap: 8px;
+    border-radius: 20px;
+    min-width: auto;
+    width: 90%;
+  }
+
+  .navbar-name {
+    font-size: 16px;
+  }
+
+  .navbar-items {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .navbar-item {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-width: 50px;
+  }
+}

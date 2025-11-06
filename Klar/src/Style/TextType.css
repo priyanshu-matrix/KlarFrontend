@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+.text-type {
+  display: inline-block;
+  white-space: pre-wrap;
+  font-family: "Roboto", sans-serif;
+  font-weight: bold;
+  font-style: normal;
+  min-width: 15ch; /* Reserve space for the longest text */
+  text-align: left;
+}
+
+.text-type__content {
+  transition: color 0.3s ease;
+}
+
+.text-type__cursor {
+  margin-left: 0.25rem;
+  display: inline-block;
+  opacity: 1;
+}
+
+.text-type__cursor--hidden {
+  display: none;
+}
+
+/* Color theme utilities */
+.text-type--gradient {
+  background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-type--rainbow {
+  animation: rainbow 3s ease-in-out infinite;
+}
+
+@keyframes rainbow {
+  0% { color: #FF6B6B; }
+  16.66% { color: #4ECDC4; }
+  33.33% { color: #45B7D1; }
+  50% { color: #96CEB4; }
+  66.66% { color: #FFEAA7; }
+  83.33% { color: #DDA0DD; }
+  100% { color: #FF6B6B; }
+}
