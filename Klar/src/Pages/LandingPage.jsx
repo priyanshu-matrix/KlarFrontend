@@ -4,9 +4,17 @@ import Navbar from "../Components/Navbar.jsx";
 import Highlight  from "../Assets/Highlight.jsx";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { Button } from "../Components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 
 const LandingPage = () => {
+  const navigate = useNavigate();
+
+  const handleGetStarted = () => {
+    navigate("/dashboard");
+  };
+
   useGSAP(
     () => {
 
@@ -17,8 +25,8 @@ const LandingPage = () => {
       <div className="pg">
         <Navbar
           bullets={[
-            { label: "Dashboard", path: "/dashboard" },
-            { label: "Contact", path: "/contact" },
+            { label: "Login", path: "/login" },
+            { label: "Sign Up", path: "/signup" },
           ]}
         />
         <div className="CentreText">
@@ -40,6 +48,14 @@ const LandingPage = () => {
           <div className="subtext-content">
             Simplify your invoicing and financial management with KLAR.
           </div>
+          <Button
+            className="get-started-button"
+            size="lg"
+            variant="outline"
+            onClick={handleGetStarted}
+          >
+            Get Started
+          </Button>
         </div>
         <div className="MiddleStuff">
           <div className="subtext-content">

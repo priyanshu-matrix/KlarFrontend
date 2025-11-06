@@ -12,14 +12,28 @@ export const useTheme = () => {
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    // Check for saved theme preference or default to 'dark'
+    // Check for saved theme preference, system preference, or default to 'light'
     const savedTheme = localStorage.getItem('theme');
-    return savedTheme || 'dark';
+    if (savedTheme) {
+      return savedTheme;
+    }
+
+    // Check system preference
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return systemPrefersDark ? 'dark' : 'light';
   });
 
   useEffect(() => {
-    // Apply theme to document root
+    // Apply theme to document root for Tailwind CSS dark mode
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // Also set data attribute for compatibility
     document.documentElement.setAttribute('data-theme', theme);
+
     // Save theme preference
     localStorage.setItem('theme', theme);
   }, [theme]);
@@ -28,10 +42,15 @@ export const ThemeProvider = ({ children }) => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
+  const setLightTheme = () => setTheme('light');
+  const setDarkTheme = () => setTheme('dark');
+
   const value = {
     theme,
     setTheme,
     toggleTheme,
+    setLightTheme,
+    setDarkTheme,
     isLight: theme === 'light',
     isDark: theme === 'dark'
   };
