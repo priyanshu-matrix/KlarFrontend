@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
 const AuthContext = createContext();
-const API_BASE_URL = 'https://05644f2f1d43.ngrok-free.app';
+const API_BASE_URL = 'https://8d826f91fce0.ngrok-free.app';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

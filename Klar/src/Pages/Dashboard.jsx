@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -35,6 +36,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../Server/api';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../Components/ui/chart';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../Components/ui/tooltip';
 import { Area, AreaChart, XAxis, YAxis } from 'recharts';
 import {
   LayoutDashboard,
@@ -60,13 +67,18 @@ import {
   MoreHorizontal,
   Calendar,
   BarChart3,
-  Check
+  Check,
+  Edit,
+  Save,
+  ArrowLeft,
+  Trash2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Dashboard = () => {
   const { theme } = useTheme();
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Debug log to check theme state
   console.log('Dashboard theme:', theme);
@@ -85,6 +97,10 @@ const Dashboard = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedInvoice, setEditedInvoice] = useState(null);
+  const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
+  const [viewerInvoice, setViewerInvoice] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -178,7 +194,7 @@ const Dashboard = () => {
       }, 200);
 
       // Make actual API call to process invoice endpoint
-      const response = await fetch('https://05644f2f1d43.ngrok-free.app/processInvoice', {
+      const response = await fetch('https://8d826f91fce0.ngrok-free.app/processInvoice', {
         method: 'POST',
         headers: headers,
         body: formData,
@@ -266,9 +282,11 @@ const Dashboard = () => {
       }
       if (userEmail) {
         headers['auth_email'] = userEmail;
+        // Also add to the invoice data
+        invoiceData.auth_email = userEmail;
       }
 
-      const response = await fetch('https://05644f2f1d43.ngrok-free.app/updateInvoice', {
+      const response = await fetch('https://8d826f91fce0.ngrok-free.app/updateInvoice', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ data: invoiceData }),
@@ -281,6 +299,8 @@ const Dashboard = () => {
         // Refresh data after update
         handleRefresh();
         setSelectedInvoice(null);
+        setIsEditing(false);
+        setEditedInvoice(null);
         setError(null);
       } else {
         const errorData = await response.json();
@@ -294,9 +314,63 @@ const Dashboard = () => {
     }
   };
 
+  const handleStartEditing = (invoice) => {
+    setIsEditing(true);
+    setEditedInvoice({ ...invoice });
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditing(false);
+    setEditedInvoice(null);
+  };
+
+  const handleSaveEditing = () => {
+    if (editedInvoice) {
+      // Include auth_email in the edited invoice
+      const updatedInvoice = {
+        ...editedInvoice,
+        auth_email: JSON.parse(localStorage.getItem('user'))?.email
+      };
+      handleUpdateInvoice(updatedInvoice);
+    }
+  };
+
+  const handleFieldChange = (field, value) => {
+    setEditedInvoice(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleLineItemChange = (index, field, value) => {
+    setEditedInvoice(prev => ({
+      ...prev,
+      line_items: prev.line_items.map((item, i) =>
+        i === index ? { ...item, [field]: field === 'quantity' || field === 'unit_cost' ? parseFloat(value) || 0 : value } : item
+      )
+    }));
+  };
+
+  const addLineItem = () => {
+    setEditedInvoice(prev => ({
+      ...prev,
+      line_items: [
+        ...(prev.line_items || []),
+        { product_name: '', quantity: 1, unit_cost: 0 }
+      ]
+    }));
+  };
+
+  const removeLineItem = (index) => {
+    setEditedInvoice(prev => ({
+      ...prev,
+      line_items: prev.line_items.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleLogout = () => {
     logout();
-    // Navigation will be handled by ProtectedRoute
+    navigate('/');
   };
 
   const getUserInitials = () => {
@@ -355,7 +429,7 @@ const Dashboard = () => {
     },
     {
       id: 'samples',
-      label: 'Samples',
+      label: 'Review & Verification',
       icon: Users,
     },
     {
@@ -454,8 +528,14 @@ const Dashboard = () => {
               {stats ? formatCurrency(stats.totalRevenue) : '---'}
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              +20.1% from last month
+              <TrendingUp className={cn(
+                "h-3 w-3",
+                stats?.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"
+              )} />
+              {stats?.revenueGrowth !== undefined ?
+                `${stats.revenueGrowth > 0 ? '+' : ''}${stats.revenueGrowth}% from last month` :
+                'No previous month data'
+              }
             </p>
           </CardContent>
         </Card>
@@ -473,7 +553,7 @@ const Dashboard = () => {
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-red-500" />
-              +10.5% from last month
+              Monthly expenses tracking
             </p>
           </CardContent>
         </Card>
@@ -491,24 +571,24 @@ const Dashboard = () => {
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
-              +15.2% from last month
+              {stats?.netProfit >= 0 ? 'Positive margin' : 'Review expenses'}
             </p>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
+            <CardTitle className="text-sm font-medium">Verification Queue</CardTitle>
             <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900">
               <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats ? stats.pendingInvoices : '---'}
+              {stats ? stats.verificationNeeded : '---'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats ? `${stats.completedInvoices} completed` : '---'}
+              {stats ? `${stats.completedInvoices} completed this month` : '---'}
             </p>
           </CardContent>
         </Card>
@@ -660,7 +740,6 @@ const Dashboard = () => {
                   <TableRow>
                     <TableHead>Invoice ID</TableHead>
                     <TableHead className="hidden sm:table-cell">Customer/Vendor</TableHead>
-                    <TableHead className="hidden md:table-cell">Product</TableHead>
                     <TableHead className="hidden lg:table-cell">Date</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
@@ -688,11 +767,6 @@ const Dashboard = () => {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="max-w-[200px] truncate">
-                          {invoice.product_name || 'N/A'}
-                        </div>
-                      </TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -707,16 +781,40 @@ const Dashboard = () => {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm" title="View Invoice">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="View Invoice"
+                            onClick={() => {
+                              setViewerInvoice(invoice);
+                              setInvoiceViewerOpen(true);
+                            }}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {invoice.pdf_path && (
-                            <Button variant="ghost" size="sm" title="Download PDF">
+                          {invoice.file_link && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Download PDF"
+                              onClick={() => {
+                                window.open(invoice.file_link, '_blank');
+                              }}
+                            >
                               <Download className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="sm" title="More Options">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Edit Invoice"
+                            onClick={() => {
+                              setSelectedInvoice(invoice);
+                              setIsEditing(true);
+                              setEditedInvoice({ ...invoice });
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -738,6 +836,240 @@ const Dashboard = () => {
     </div>
   );
 
+  // Invoice Viewer Modal Component
+  const InvoiceViewer = () => (
+    <AlertDialog open={invoiceViewerOpen} onOpenChange={setInvoiceViewerOpen}>
+      <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center justify-between">
+            <span>Invoice Viewer - {viewerInvoice?.invoice_id}</span>
+            <div className="flex gap-2">
+              {viewerInvoice?.file_link && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(viewerInvoice.file_link, '_blank')}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedInvoice(viewerInvoice);
+                  setIsEditing(true);
+                  setEditedInvoice({ ...viewerInvoice });
+                  setInvoiceViewerOpen(false);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setInvoiceViewerOpen(false)}
+                      className="h-8 w-8 p-0"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Close (Esc)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Complete invoice information and details. Press Esc or click the X button to close.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {viewerInvoice && (
+          <div className="space-y-6">
+            {/* Header Information */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Invoice ID</Label>
+                <p className="text-lg font-semibold">{viewerInvoice.invoice_id}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                <div className="mt-1">
+                  {getStatusBadge(viewerInvoice.status, viewerInvoice.human_verification_required)}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Total Amount</Label>
+                <p className="text-lg font-bold text-green-600">
+                  {formatCurrency(viewerInvoice.total_amount_payable)}
+                </p>
+              </div>
+            </div>
+
+            {/* Customer & Order Information */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Customer & Order Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Customer Name</Label>
+                  <p className="text-sm mt-1">{viewerInvoice.customer_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Vendor Name</Label>
+                  <p className="text-sm mt-1">{viewerInvoice.extracted_vendor_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Order ID</Label>
+                  <p className="text-sm mt-1">{viewerInvoice.order_id || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Vendor ID</Label>
+                  <p className="text-sm mt-1">{viewerInvoice.canonical_vendor_id || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Date</Label>
+                  <p className="text-sm mt-1">{new Date(viewerInvoice.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Ship Mode</Label>
+                  <p className="text-sm mt-1">{viewerInvoice.ship_mode || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Shipping Address */}
+            {viewerInvoice.ship_to_address && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Shipping Address</h3>
+                <p className="text-sm p-3 bg-muted/50 rounded-lg">{viewerInvoice.ship_to_address}</p>
+              </div>
+            )}
+
+            {/* Line Items */}
+            {viewerInvoice.line_items && viewerInvoice.line_items.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Line Items</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Cost</TableHead>
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewerInvoice.line_items.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{item.product_name}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{formatCurrency(item.unit_cost)}</TableCell>
+                          <TableCell className="font-medium">
+                            {formatCurrency(item.quantity * item.unit_cost)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Financial Summary */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Financial Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label className="text-sm">Subtotal:</Label>
+                    <span className="text-sm font-medium">{formatCurrency(viewerInvoice.sub_total || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <Label className="text-sm">Discount:</Label>
+                    <span className="text-sm font-medium">-{formatCurrency(viewerInvoice.discount || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <Label className="text-sm">Shipping:</Label>
+                    <span className="text-sm font-medium">{formatCurrency(viewerInvoice.shipping_fee || 0)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <Label className="text-base font-semibold">Total:</Label>
+                    <span className="text-base font-bold text-green-600">
+                      {formatCurrency(viewerInvoice.total_amount_payable)}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-sm">Currency:</Label>
+                    <p className="text-sm mt-1">{viewerInvoice.currency} ({viewerInvoice.extracted_currency})</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Technical Details */}
+            <div>
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                  🔧 Technical Details
+                </summary>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-sm font-medium">Task ID</Label>
+                    <p className="text-xs font-mono mt-1 break-all">{viewerInvoice.task_id}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">PDF Path</Label>
+                    <p className="text-xs font-mono mt-1 break-all">{viewerInvoice.pdf_path}</p>
+                  </div>
+                  {viewerInvoice.file_link && (
+                    <div>
+                      <Label className="text-sm font-medium">File Link</Label>
+                      <p className="text-xs font-mono mt-1 break-all">
+                        <a
+                          href={viewerInvoice.file_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {viewerInvoice.file_link}
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
+
+            {/* Description */}
+            {viewerInvoice.description && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Description</h3>
+                <p className="text-sm p-3 bg-muted/50 rounded-lg">{viewerInvoice.description}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>Close</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   const renderSamples = () => {
     const needsVerificationInvoices = dashboardData?.invoices?.filter(
       invoice => invoice.human_verification_required
@@ -747,9 +1079,9 @@ const Dashboard = () => {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Samples & Verification</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Review & Verification</h2>
             <p className="text-muted-foreground">
-              Sample invoices and items that need verification
+              Invoices and items that need verification
             </p>
           </div>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
@@ -757,6 +1089,66 @@ const Dashboard = () => {
             Refresh Data
           </Button>
         </div>
+
+        {/* Bulk Actions */}
+        {needsVerificationInvoices.length > 0 && (
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <FileText className="h-5 w-5" />
+                Bulk Actions
+              </CardTitle>
+              <CardDescription>
+                Apply actions to multiple invoices at once
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Approve all verification required invoices
+                    needsVerificationInvoices.forEach(invoice => {
+                      const updatedInvoice = {
+                        ...invoice,
+                        human_verification_required: false,
+                        status: 'completed',
+                        auth_email: JSON.parse(localStorage.getItem('user'))?.email
+                      };
+                      handleUpdateInvoice(updatedInvoice);
+                    });
+                  }}
+                  disabled={isUpdating}
+                  className="flex items-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  Approve All ({needsVerificationInvoices.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Mark all as pending for further review
+                    needsVerificationInvoices.forEach(invoice => {
+                      const updatedInvoice = {
+                        ...invoice,
+                        status: 'pending',
+                        auth_email: JSON.parse(localStorage.getItem('user'))?.email
+                      };
+                      handleUpdateInvoice(updatedInvoice);
+                    });
+                  }}
+                  disabled={isUpdating}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Mark All as Pending
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Needs Verification Section */}
         <Card className="hover:shadow-lg transition-shadow duration-200">
@@ -806,16 +1198,29 @@ const Dashboard = () => {
                           onClick={() => setSelectedInvoice(invoice)}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          Review
+                          Review & Edit
                         </Button>
+                        {invoice.file_link && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(invoice.file_link, '_blank')}
+                            title="Download PDF"
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
+                          </Button>
+                        )}
                         <Button
                           variant="default"
                           size="sm"
                           onClick={() => {
+                            // Quick approve - set verification to false and status to completed
                             const updatedInvoice = {
                               ...invoice,
                               human_verification_required: false,
-                              status: 'completed'
+                              status: 'completed',
+                              auth_email: JSON.parse(localStorage.getItem('user'))?.email
                             };
                             handleUpdateInvoice(updatedInvoice);
                           }}
@@ -826,7 +1231,7 @@ const Dashboard = () => {
                           ) : (
                             <Check className="h-4 w-4 mr-1" />
                           )}
-                          Approve
+                          Quick Approve
                         </Button>
                       </div>
                     </div>
@@ -844,40 +1249,347 @@ const Dashboard = () => {
 
         {/* Invoice Detail Modal */}
         {selectedInvoice && (
-          <AlertDialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
-            <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <AlertDialog open={!!selectedInvoice} onOpenChange={() => {
+            setSelectedInvoice(null);
+            setIsEditing(false);
+            setEditedInvoice(null);
+          }}>
+            <AlertDialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
               <AlertDialogHeader>
-                <AlertDialogTitle>Invoice Details - {selectedInvoice.invoice_id}</AlertDialogTitle>
+                <AlertDialogTitle className="flex items-center justify-between">
+                  <span>Invoice Details - {selectedInvoice.invoice_id}</span>
+                  <div className="flex items-center gap-2">
+                    {isEditing ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEditing}
+                        className="flex items-center gap-1"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to View
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStartEditing(selectedInvoice)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedInvoice(null);
+                              setIsEditing(false);
+                              setEditedInvoice(null);
+                            }}
+                            className="h-8 w-8 p-0"
+                            aria-label="Close"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Close Modal (Esc)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Review and verify the extracted invoice information
+                  {isEditing ? 'Edit invoice information and save changes. Click "Back to View" to cancel changes.' : 'Review and verify the extracted invoice information. Press Esc or click X to close.'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Invoice ID</Label>
-                    <p className="text-sm">{selectedInvoice.invoice_id}</p>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Basic Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Invoice ID *</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.invoice_id || ''}
+                          onChange={(e) => handleFieldChange('invoice_id', e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., PPP/0001/25-26"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.invoice_id}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Order ID</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.order_id || ''}
+                          onChange={(e) => handleFieldChange('order_id', e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., order101"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.order_id || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Task ID</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.task_id || ''}
+                          onChange={(e) => handleFieldChange('task_id', e.target.value)}
+                          className="mt-1"
+                          placeholder="UUID"
+                        />
+                      ) : (
+                        <p className="text-xs mt-1 font-mono">{selectedInvoice.task_id || 'N/A'}</p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium">Customer/Vendor</Label>
-                    <p className="text-sm">{selectedInvoice.customer_name || selectedInvoice.extracted_vendor_name}</p>
+
+                  <h3 className="text-lg font-semibold border-b pb-2 mt-6">Customer & Vendor Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Customer Name</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.customer_name || ''}
+                          onChange={(e) => handleFieldChange('customer_name', e.target.value)}
+                          className="mt-1"
+                          placeholder="Customer name"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.customer_name || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Extracted Vendor Name</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.extracted_vendor_name || ''}
+                          onChange={(e) => handleFieldChange('extracted_vendor_name', e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., Add Company Name"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.extracted_vendor_name || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Canonical Vendor ID</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.canonical_vendor_id || ''}
+                          onChange={(e) => handleFieldChange('canonical_vendor_id', e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., VEND_0006"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.canonical_vendor_id || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Ship to Address</Label>
+                      {isEditing ? (
+                        <textarea
+                          value={editedInvoice?.ship_to_address || ''}
+                          onChange={(e) => handleFieldChange('ship_to_address', e.target.value)}
+                          className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          rows={3}
+                          placeholder="Shipping address"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.ship_to_address || 'N/A'}</p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium">Date</Label>
-                    <p className="text-sm">{new Date(selectedInvoice.date).toLocaleDateString()}</p>
+
+                  <h3 className="text-lg font-semibold border-b pb-2 mt-6">Date & Shipping</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Date *</Label>
+                      {isEditing ? (
+                        <Input
+                          type="date"
+                          value={editedInvoice?.date || ''}
+                          onChange={(e) => handleFieldChange('date', e.target.value)}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{new Date(selectedInvoice.date).toLocaleDateString()}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Ship Mode</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.ship_mode || ''}
+                          onChange={(e) => handleFieldChange('ship_mode', e.target.value)}
+                          className="mt-1"
+                          placeholder="e.g., Sanjay Transportation"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.ship_mode || 'N/A'}</p>
+                      )}
+                    </div>
                   </div>
+
+                  <h3 className="text-lg font-semibold border-b pb-2 mt-6">Description</h3>
                   <div>
-                    <Label className="text-sm font-medium">Total Amount</Label>
-                    <p className="text-sm font-bold">{formatCurrency(selectedInvoice.total_amount_payable)}</p>
+                    <Label className="text-sm font-medium">Invoice Description</Label>
+                    {isEditing ? (
+                      <textarea
+                        value={editedInvoice?.description || ''}
+                        onChange={(e) => handleFieldChange('description', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={3}
+                        placeholder="Invoice description..."
+                      />
+                    ) : (
+                      <p className="text-sm mt-1 p-2 bg-muted/50 rounded">{selectedInvoice.description || 'N/A'}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Financial Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Currency</Label>
+                      {isEditing ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={editedInvoice?.currency || ''}
+                            onChange={(e) => handleFieldChange('currency', e.target.value)}
+                            className="mt-1"
+                            placeholder="INR"
+                          />
+                          <Input
+                            value={editedInvoice?.extracted_currency || ''}
+                            onChange={(e) => handleFieldChange('extracted_currency', e.target.value)}
+                            className="mt-1"
+                            placeholder="₹"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-sm mt-1">{selectedInvoice.currency} ({selectedInvoice.extracted_currency})</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Subtotal</Label>
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          value={editedInvoice?.sub_total || 0}
+                          onChange={(e) => handleFieldChange('sub_total', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                          step="0.01"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{formatCurrency(selectedInvoice.sub_total || 0)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Discount</Label>
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          value={editedInvoice?.discount || 0}
+                          onChange={(e) => handleFieldChange('discount', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                          step="0.01"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{formatCurrency(selectedInvoice.discount || 0)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Shipping Fee</Label>
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          value={editedInvoice?.shipping_fee || 0}
+                          onChange={(e) => handleFieldChange('shipping_fee', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                          step="0.01"
+                        />
+                      ) : (
+                        <p className="text-sm mt-1">{formatCurrency(selectedInvoice.shipping_fee || 0)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Total Amount *</Label>
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          value={editedInvoice?.total_amount_payable || 0}
+                          onChange={(e) => handleFieldChange('total_amount_payable', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                          step="0.01"
+                        />
+                      ) : (
+                        <p className="text-sm font-bold mt-1">{formatCurrency(selectedInvoice.total_amount_payable)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* File Information */}
+                  <h3 className="text-lg font-semibold border-b pb-2 mt-6">File & Technical Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">PDF Path</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.pdf_path || ''}
+                          onChange={(e) => handleFieldChange('pdf_path', e.target.value)}
+                          className="mt-1"
+                          placeholder="tests/file.pdf"
+                        />
+                      ) : (
+                        <p className="text-xs mt-1 font-mono">{selectedInvoice.pdf_path || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">File Link</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editedInvoice?.file_link || ''}
+                          onChange={(e) => handleFieldChange('file_link', e.target.value)}
+                          className="mt-1"
+                          placeholder="https://domain.com/files/file.pdf"
+                        />
+                      ) : (
+                        <p className="text-xs mt-1 font-mono break-all">{selectedInvoice.file_link || 'N/A'}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Line Items */}
-                {selectedInvoice.line_items && selectedInvoice.line_items.length > 0 && (
+                {(selectedInvoice.line_items && selectedInvoice.line_items.length > 0) || (isEditing && editedInvoice?.line_items) && (
                   <div>
-                    <Label className="text-sm font-medium mb-2 block">Line Items</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">Line Items</Label>
+                      {isEditing && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addLineItem}
+                          className="flex items-center gap-1"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add Item
+                        </Button>
+                      )}
+                    </div>
                     <div className="border rounded-lg overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -886,15 +1598,64 @@ const Dashboard = () => {
                             <TableHead>Quantity</TableHead>
                             <TableHead>Unit Cost</TableHead>
                             <TableHead>Total</TableHead>
+                            {isEditing && <TableHead>Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {selectedInvoice.line_items.map((item, index) => (
+                          {(isEditing ? editedInvoice.line_items : selectedInvoice.line_items)?.map((item, index) => (
                             <TableRow key={index}>
-                              <TableCell>{item.product_name}</TableCell>
-                              <TableCell>{item.quantity}</TableCell>
-                              <TableCell>{formatCurrency(item.unit_cost)}</TableCell>
-                              <TableCell>{formatCurrency(item.quantity * item.unit_cost)}</TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    value={item.product_name || ''}
+                                    onChange={(e) => handleLineItemChange(index, 'product_name', e.target.value)}
+                                    className="w-full"
+                                    placeholder="Product name"
+                                  />
+                                ) : (
+                                  item.product_name
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    type="number"
+                                    value={item.quantity || 0}
+                                    onChange={(e) => handleLineItemChange(index, 'quantity', e.target.value)}
+                                    className="w-20"
+                                    min="0"
+                                  />
+                                ) : (
+                                  item.quantity
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    type="number"
+                                    value={item.unit_cost || 0}
+                                    onChange={(e) => handleLineItemChange(index, 'unit_cost', e.target.value)}
+                                    className="w-24"
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                ) : (
+                                  formatCurrency(item.unit_cost)
+                                )}
+                              </TableCell>
+                              <TableCell>{formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}</TableCell>
+                              {isEditing && (
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeLineItem(index)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -903,45 +1664,228 @@ const Dashboard = () => {
                   </div>
                 )}
 
+                {/* Status and Verification */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Status</Label>
+                    {isEditing ? (
+                      <select
+                        value={editedInvoice?.status || ''}
+                        onChange={(e) => handleFieldChange('status', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    ) : (
+                      <p className="text-sm mt-1 capitalize">{selectedInvoice.status}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Human Verification Required</Label>
+                    {isEditing ? (
+                      <div className="mt-1 flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={editedInvoice?.human_verification_required || false}
+                          onChange={(e) => handleFieldChange('human_verification_required', e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm">Requires verification</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm mt-1">{selectedInvoice.human_verification_required ? 'Yes' : 'No'}</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Verification Reason */}
-                {selectedInvoice.human_verification_reason && (
-                  <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
-                    <Label className="text-sm font-medium">Verification Required Because:</Label>
-                    <p className="text-sm mt-1">{selectedInvoice.human_verification_reason}</p>
+                {(selectedInvoice.human_verification_reason || (isEditing && editedInvoice?.human_verification_required)) && (
+                  <div>
+                    <Label className="text-sm font-medium">Verification Reason</Label>
+                    {isEditing ? (
+                      <textarea
+                        value={editedInvoice?.human_verification_reason || ''}
+                        onChange={(e) => handleFieldChange('human_verification_reason', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={3}
+                        placeholder="Enter reason for verification if required"
+                      />
+                    ) : (
+                      <div className="mt-1 p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                        <p className="text-sm">{selectedInvoice.human_verification_reason}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* API Preview for Developers */}
+                {isEditing && (
+                  <div className="border-t pt-4">
+                    <details className="group">
+                      <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                        🔧 Developer Preview - API Payload
+                      </summary>
+                      <div className="mt-2 p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">This is the data that will be sent to the updateInvoice endpoint:</p>
+                        <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
+                          {JSON.stringify(
+                            {
+                              data: {
+                                ...editedInvoice,
+                                auth_email: JSON.parse(localStorage.getItem('user'))?.email
+                              }
+                            },
+                            null,
+                            2
+                          )}
+                        </pre>
+                      </div>
+                    </details>
                   </div>
                 )}
               </div>
 
-              <AlertDialogFooter>
-                <AlertDialogCancel>Close</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    const updatedInvoice = {
-                      ...selectedInvoice,
-                      human_verification_required: false,
-                      status: 'completed'
-                    };
-                    handleUpdateInvoice(updatedInvoice);
-                  }}
-                  disabled={isUpdating}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isUpdating ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Approve & Complete
-                    </>
-                  )}
-                </AlertDialogAction>
+              <AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                {isEditing ? (
+                  <>
+                    <Button variant="outline" onClick={handleCancelEditing} className="flex items-center gap-2">
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to View
+                    </Button>
+                    <Button
+                      onClick={handleSaveEditing}
+                      disabled={isUpdating}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <AlertDialogCancel>Close</AlertDialogCancel>
+                    <Button
+                      onClick={() => handleStartEditing(selectedInvoice)}
+                      variant="outline"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Invoice
+                    </Button>
+                    <AlertDialogAction
+                      onClick={() => {
+                        const updatedInvoice = {
+                          ...selectedInvoice,
+                          human_verification_required: false,
+                          status: 'completed',
+                          auth_email: JSON.parse(localStorage.getItem('user'))?.email
+                        };
+                        handleUpdateInvoice(updatedInvoice);
+                      }}
+                      disabled={isUpdating}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Approve & Complete
+                        </>
+                      )}
+                    </AlertDialogAction>
+                  </>
+                )}
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         )}
+
+        {/* Invoice Template */}
+        <Card className="hover:shadow-lg transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-500" />
+              Invoice Template & API Example
+            </CardTitle>
+            <CardDescription>
+              Invoice structure for testing the updateInvoice endpoint
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <h4 className="font-medium mb-2">Example Invoice JSON Structure</h4>
+                <pre className="text-xs overflow-x-auto whitespace-pre-wrap text-muted-foreground">
+{`{
+  "data": {
+    "invoice_id": "PPP/0001/25-26",
+    "order_id": "order101",
+    "customer_name": null,
+    "extracted_vendor_name": "Add Company Name",
+    "canonical_vendor_id": "VEND_0006",
+    "ship_to_address": null,
+    "date": "2025-10-22",
+    "ship_mode": "Sanjay Transportation",
+    "description": "Invoice PPP/0001/25-26 from Add Company Name for 116800.00 ₹.",
+    "line_items": [
+      {
+        "product_name": "Item Description I",
+        "quantity": 1,
+        "unit_cost": 100000.0
+      }
+    ],
+    "extracted_currency": "₹",
+    "currency": "INR",
+    "sub_total": 100000.0,
+    "discount": 1200.0,
+    "shipping_fee": 0.0,
+    "total_amount_payable": 116800.0,
+    "human_verification_required": false,
+    "human_verification_reason": null,
+    "status": "completed",
+    "pdf_path": "tests/4b09e9bd-ed58-4502-bb8a-a316063425ce.pdf",
+    "task_id": "b476337a-b9b8-46ff-bbf5-c6b353ce81af",
+    "file_link": "https://8d826f91fce0.ngrok-free.app/files/4b09e9bd-ed58-4502-bb8a-a316063425ce.pdf",
+    "auth_email": "techzorg48@gmail.com"
+  }
+}`}
+                </pre>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <h5 className="font-medium mb-2">Required Headers:</h5>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li>• Content-Type: application/json</li>
+                    <li>• auth_email: {JSON.parse(localStorage.getItem('user'))?.email || 'user@example.com'}</li>
+                    <li>• Authorization: Bearer [token]</li>
+                  </ul>
+                </div>
+                <div>
+                  <h5 className="font-medium mb-2">Key Fields to Update:</h5>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li>• human_verification_required: boolean</li>
+                    <li>• status: "pending" | "completed"</li>
+                    <li>• total_amount_payable: number</li>
+                    <li>• line_items: array of products</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   };
@@ -971,37 +1915,112 @@ const Dashboard = () => {
             </div>
 
             {/* Analytics Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="hover:shadow-lg transition-shadow duration-200">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-green-500" />
-                    Revenue Growth
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">+24.5%</div>
-                  <p className="text-sm text-muted-foreground">vs last month</p>
-                  <div className="mt-4 h-2 bg-muted rounded-full">
-                    <div className="h-2 bg-green-500 rounded-full" style={{width: '75%'}}></div>
+            {/* Key Insights Summary */}
+            <Card className="hover:shadow-lg transition-shadow duration-200">
+              <CardHeader>
+                <CardTitle>Key Insights</CardTitle>
+                <CardDescription>Important metrics and trends from your invoice data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm font-medium">Average Invoice Value</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {stats && stats.totalTransactions > 0
+                        ? formatCurrency(stats.totalRevenue / stats.totalTransactions)
+                        : formatCurrency(0)
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Based on {stats?.totalTransactions || 0} total invoices
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm font-medium">Monthly Velocity</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {stats?.thisMonthInvoices || 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Invoices processed this month
+                    </p>
+                  </div>
+                  {stats?.verificationNeeded > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        <span className="text-sm font-medium">Action Required</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {stats.verificationNeeded}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Invoices need verification
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                      <span className="text-sm font-medium">Efficiency Score</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {stats && stats.totalTransactions > 0
+                        ? `${((stats.completedInvoices / stats.totalTransactions) * 100).toFixed(0)}%`
+                        : '100%'
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Invoices completed without issues
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* Monthly Performance Metrics */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-500" />
-                    Invoice Processing
+                    <Calendar className="h-5 w-5 text-blue-500" />
+                    This Month
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    {stats ? `${stats.completedInvoices + stats.pendingInvoices}` : '---'}
+                    {stats ? stats.thisMonthInvoices : '---'}
                   </div>
-                  <p className="text-sm text-muted-foreground">total processed</p>
-                  <div className="mt-4 h-2 bg-muted rounded-full">
-                    <div className="h-2 bg-blue-500 rounded-full" style={{width: '85%'}}></div>
+                  <p className="text-sm text-muted-foreground">invoices processed</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Revenue: {stats ? formatCurrency(stats.thisMonthRevenue) : '---'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow duration-200">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    Growth Rate
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className={cn(
+                    "text-2xl font-bold",
+                    stats?.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
+                  )}>
+                    {stats?.revenueGrowth !== undefined ? `${stats.revenueGrowth > 0 ? '+' : ''}${stats.revenueGrowth}%` : '---'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">vs last month</p>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                    <p>This month: {stats ? formatCurrency(stats.thisMonthRevenue || 0) : '---'}</p>
+                    <p>Last month: {stats ? formatCurrency(stats.lastMonthRevenue || 0) : '---'}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1009,16 +2028,39 @@ const Dashboard = () => {
               <Card className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-purple-500" />
-                    Efficiency Rate
+                    <FileText className="h-5 w-5 text-purple-500" />
+                    Processing Rate
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">96.2%</div>
-                  <p className="text-sm text-muted-foreground">processing accuracy</p>
-                  <div className="mt-4 h-2 bg-muted rounded-full">
-                    <div className="h-2 bg-purple-500 rounded-full" style={{width: '96%'}}></div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {stats && stats.totalTransactions > 0
+                      ? `${((stats.completedInvoices / stats.totalTransactions) * 100).toFixed(1)}%`
+                      : '---'
+                    }
                   </div>
+                  <p className="text-sm text-muted-foreground">completion rate</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats ? `${stats.completedInvoices}/${stats.totalTransactions}` : '---'} processed
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow duration-200">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-orange-500" />
+                    Queue Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {stats ? (stats.verificationNeeded + stats.pendingInvoices) : '---'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">items in queue</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats ? stats.verificationNeeded : '---'} need verification
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -1589,7 +2631,7 @@ const Dashboard = () => {
                   <p className="hidden sm:block text-sm text-muted-foreground">
                     {activeView === 'overview' && 'Dashboard overview and recent activity'}
                     {activeView === 'invoices' && 'Manage your invoices'}
-                    {activeView === 'samples' && 'Sample invoices and verification'}
+                    {activeView === 'samples' && 'Review and verification center'}
                     {activeView === 'analytics' && 'Revenue and expense analytics'}
                     {activeView === 'upload' && 'Upload new invoices'}
                     {activeView === 'settings' && 'Application settings'}
@@ -1647,6 +2689,9 @@ const Dashboard = () => {
           </main>
         </div>
       </div>
+
+      {/* Invoice Viewer Modal */}
+      <InvoiceViewer />
     </div>
   );
 };
