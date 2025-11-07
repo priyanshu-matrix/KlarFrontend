@@ -1080,18 +1080,18 @@ const Dashboard = () => {
                         tickLine={false}
                         axisLine={false}
                         tickMargin={8}
-                        tick={{ 
-                          fontSize: 12, 
-                          fill: theme === 'dark' ? '#e5e7eb' : '#374151' 
+                        tick={{
+                          fontSize: 12,
+                          fill: theme === 'dark' ? '#e5e7eb' : '#374151'
                         }}
                       />
                       <YAxis
                         tickLine={false}
                         axisLine={false}
                         tickMargin={8}
-                        tick={{ 
-                          fontSize: 12, 
-                          fill: theme === 'dark' ? '#e5e7eb' : '#374151' 
+                        tick={{
+                          fontSize: 12,
+                          fill: theme === 'dark' ? '#e5e7eb' : '#374151'
                         }}
                         tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
                       />
