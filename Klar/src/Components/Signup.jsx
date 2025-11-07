@@ -77,6 +77,16 @@ const Signup = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-between items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              className="h-8 w-8"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Button>
             <CardTitle className="text-2xl font-bold text-center flex-1">
               Create an account
             </CardTitle>

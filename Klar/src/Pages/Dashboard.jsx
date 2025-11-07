@@ -147,15 +147,27 @@ const Dashboard = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Define accepted file types
+    const acceptedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/bmp',
+      'image/tiff',
+      'image/webp'
+    ];
+
     // Validate file type
-    if (file.type !== 'application/pdf') {
-      setError('Please upload a PDF file');
+    if (!acceptedTypes.includes(file.type)) {
+      setError('Please upload a PDF or image file (JPEG, PNG, GIF, BMP, TIFF, WebP)');
       return;
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB');
+    // Validate file size (15MB limit - increased for images)
+    if (file.size > 15 * 1024 * 1024) {
+      setError('File size must be less than 15MB');
       return;
     }
 
@@ -250,7 +262,20 @@ const Dashboard = () => {
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       const file = files[0];
-      if (file.type === 'application/pdf') {
+
+      // Define accepted file types
+      const acceptedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/bmp',
+        'image/tiff',
+        'image/webp'
+      ];
+
+      if (acceptedTypes.includes(file.type)) {
         // Simulate file input change event
         const event = {
           target: {
@@ -259,7 +284,7 @@ const Dashboard = () => {
         };
         handleFileUpload(event);
       } else {
-        setError('Please upload a PDF file');
+        setError('Please upload a PDF or image file (JPEG, PNG, GIF, BMP, TIFF, WebP)');
       }
     }
   };
@@ -2241,7 +2266,7 @@ const Dashboard = () => {
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Upload Invoice</h2>
               <p className="text-muted-foreground">
-                Upload PDF invoices for automated processing and data extraction
+                Upload PDF documents or images for automated processing and data extraction
               </p>
             </div>
 
@@ -2274,12 +2299,12 @@ const Dashboard = () => {
                         {isUploading
                           ? 'Uploading...'
                           : isDragOver
-                          ? 'Drop your PDF here'
-                          : 'Drop your PDF here, or click to upload'
+                          ? 'Drop your file here'
+                          : 'Drop your files here, or click to upload'
                         }
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Supports: PDF files up to 10MB
+                        Supports: PDF documents and images (JPEG, PNG, GIF, BMP, TIFF, WebP) up to 15MB
                       </p>
                     </div>
                     {isUploading && (
@@ -2504,8 +2529,6 @@ const Dashboard = () => {
                 isUploading && "opacity-50 cursor-not-allowed"
               )}
             >
-              <Upload className="h-4 w-4 shrink-0" />
-              {sidebarOpen && <span>Upload Invoice</span>}
             </button>
           </div>
 
@@ -2661,7 +2684,7 @@ const Dashboard = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,image/*"
               onChange={handleFileUpload}
               className="hidden"
             />
